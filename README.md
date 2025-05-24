@@ -1,5 +1,4 @@
-# Trabalho Prático Final - Fases 1 e 2  
-**Disciplina:** GCC262 - Grafos e Suas Aplicações  
+# Trabalho Prático Final - Fases 1 e 2   
 **Universidade Federal de Lavras (UFLA)**  
 **Professor:** Mayron César O. Moreira  
 
