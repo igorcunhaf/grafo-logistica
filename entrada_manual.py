@@ -1,4 +1,4 @@
-from grafo import Grafo  # certifique-se de que a classe Grafo está em grafo.py
+from grafo import Grafo
 
 def ler_dados_via_input():
     print("=== Entrada manual de dados do grafo ===")
