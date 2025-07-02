@@ -45,7 +45,7 @@ def escrever_arquivo_solucao(rotas, custo_total, grafo, arquivo_saida):
 # Exemplo de uso (requer Rota from solucao_inicial e Grafo)
 if __name__ == '__main__':
     # Simular dados de entrada
-    from heuristica_path_scanning import Rota
+    from rota import Rota # Importa a classe Rota do novo módulo
     from grafo import Grafo # Precisa da classe Grafo
 
     # Criar rotas de exemplo

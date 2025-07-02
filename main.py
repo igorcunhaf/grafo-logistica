@@ -1,21 +1,21 @@
+from busca_local import two_opt, relocate, swap
 import os
 import sys
 import time
 
-# Adiciona o diretório atual ao path para encontrar os módulos
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from parser import ler_arquivo_dat
-from grafo import Grafo # Importa a classe Grafo atualizada
-
-# Imports específicos das Etapas
-from estatisticas import calcular_estatisticas # Corrigido para Etapa 1
-from heuristica_path_scanning import construir_solucao_path_scanning # Etapa 2
-from gerar_arquivo_solucao import escrever_arquivo_solucao # Etapa 2 (CORRIGIDO)
-from entrada_manual import ler_dados_via_input # Restaurado para entrada manual
+from grafo import Grafo
+from estatisticas import calcular_estatisticas
+from heuristica_path_scanning import construir_solucao_path_scanning, construir_solucao_path_scanning_multi
+from melhoria import melhorar_solucao_2opt
+from algoritmo_genetico_avancado import otimizar_com_algoritmo_genetico_avancado
+from gerar_arquivo_solucao import escrever_arquivo_solucao
+from entrada_manual import ler_dados_via_input
+from ruin_and_recreate import ruin_and_recreate   # << INTEGRAÇÃO DO R&R
 
 def listar_instancias(pasta):
-    """Lista arquivos .dat em uma pasta."""
     try:
         if not os.path.isdir(pasta):
             return []
@@ -25,22 +25,19 @@ def listar_instancias(pasta):
         return []
 
 def selecionar_instancia(pastas_dados):
-    """Permite ao usuário selecionar uma instância de uma lista de pastas."""
     instancias_encontradas = []
     mapa_indices = {}
     idx_global = 0
 
-    print("\n=== Escolha uma instância de teste ===") # Mantendo texto original
+    print("\n=== Escolha uma instância de teste ===")
     for pasta in pastas_dados:
         instancias = listar_instancias(pasta)
         if instancias:
             pasta_relativa = os.path.relpath(pasta, os.getcwd())
-            # print(f"--- Pasta: {pasta_relativa} ---") # Removido para ficar igual ao original
             for nome in instancias:
                 print(f"[{idx_global}] {nome}")
                 mapa_indices[idx_global] = os.path.join(pasta, nome)
                 idx_global += 1
-            # print("---")
 
     if not mapa_indices:
         print("Nenhuma instância .dat encontrada nas pastas configuradas.")
@@ -48,37 +45,33 @@ def selecionar_instancia(pastas_dados):
 
     while True:
         try:
-            # Mantendo texto original
             escolha = int(input(f"Digite o número da instância: "))
             if escolha in mapa_indices:
                 caminho_completo = mapa_indices[escolha]
                 nome_arquivo = os.path.basename(caminho_completo)
                 return caminho_completo, nome_arquivo
             else:
-                print("Opção inválida.") # Mantendo texto original
+                print("Opção inválida.")
         except ValueError:
             print("Entrada inválida. Digite um número.")
 
 def executar_etapa1(grafo):
-    """Calcula e exibe as estatísticas da Etapa 1 no formato original."""
-    # Removido o print "--- Executando Etapa 1 ---" para seguir fluxo original
     if not grafo:
         print("Erro: Grafo não carregado.")
-        return False # Indica falha
+        return False
     try:
         stats = calcular_estatisticas(grafo)
         print("\n=== Estatísticas do Grafo ===")
         for k, v in stats.items():
             print(f"{k}: {v}")
-        return True # Indica sucesso
+        return True
     except Exception as e:
         print(f"Erro ao calcular estatísticas: {e}")
         import traceback
         traceback.print_exc()
-        return False # Indica falha
+        return False
 
 def executar_etapa2(grafo, nome_instancia):
-    """Executa a lógica da Etapa 2 (solução inicial Path-Scanning)."""
     print("\n--- Executando Etapa 2: Geração de Solução Inicial (Path-Scanning) ---")
 
     if not grafo:
@@ -87,11 +80,11 @@ def executar_etapa2(grafo, nome_instancia):
 
     try:
         if grafo.dist_matrix is None:
-             print("Calculando matrizes de caminhos mínimos (Floyd-Warshall)...", end=" ", flush=True)
-             start_fw = time.time()
-             grafo.calcular_distancias_predecessores_floyd_warshall()
-             end_fw = time.time()
-             print(f"Concluído em {end_fw - start_fw:.4f} segundos.")
+            print("Calculando matrizes de caminhos mínimos (Floyd-Warshall)...", end=" ", flush=True)
+            start_fw = time.time()
+            grafo.calcular_distancias_predecessores_floyd_warshall()
+            end_fw = time.time()
+            print(f"Concluído em {end_fw - start_fw:.4f} segundos.")
 
         print("Construindo rotas com Path-Scanning...", end=" ", flush=True)
         rotas, custo_total, tempo_heuristica = construir_solucao_path_scanning(grafo)
@@ -103,7 +96,6 @@ def executar_etapa2(grafo, nome_instancia):
         nome_arquivo_solucao = f"sol-{nome_base_instancia}.dat"
         caminho_arquivo_saida = os.path.join(pasta_solucoes, nome_arquivo_solucao)
 
-        # CORRIGIDO: Passa o objeto grafo como terceiro argumento
         escrever_arquivo_solucao(rotas, custo_total, grafo, caminho_arquivo_saida)
 
         print(f"\nSolução da Etapa 2 gerada para a instância {nome_instancia}.")
@@ -113,7 +105,7 @@ def executar_etapa2(grafo, nome_instancia):
         return caminho_arquivo_saida
 
     except ValueError as ve:
-         print(f"\nErro durante a execução da Etapa 2: {ve}")
+        print(f"\nErro durante a execução da Etapa 2: {ve}")
     except Exception as e:
         print(f"\nErro inesperado durante a Etapa 2: {e}")
         import traceback
@@ -129,7 +121,6 @@ def main():
     nome_instancia_carregada = None
     caminho_instancia_carregada = None
 
-    # Pastas onde procurar por instâncias .dat
     pastas_instancias = [
         "selected_instances",
         "../G0/G0",
@@ -137,7 +128,6 @@ def main():
     ]
     pastas_validas = [p for p in pastas_instancias if os.path.isdir(p)]
 
-    # Menu inicial para escolher o modo de entrada (como no original)
     print("\n=== Modo de entrada ===")
     print("[1] Escolher uma instância da pasta 'selected_instances' (ou outras configuradas)")
     print("[2] Inserir os dados manualmente via terminal")
@@ -145,8 +135,8 @@ def main():
 
     if escolha_modo == "1":
         if not pastas_validas:
-             print("Aviso: Nenhuma das pastas de instâncias configuradas foi encontrada.")
-             return
+            print("Aviso: Nenhuma das pastas de instâncias configuradas foi encontrada.")
+            return
         caminho_instancia, nome_instancia = selecionar_instancia(pastas_validas)
         if caminho_instancia:
             print(f"\nLendo instância: {caminho_instancia}...")
@@ -158,7 +148,7 @@ def main():
             else:
                 print("Falha ao carregar o grafo da instância selecionada.")
         else:
-             return # Sai se não selecionou instância
+            return
 
     elif escolha_modo == "2":
         print("\n--- Inserção Manual de Grafo (Etapa 1) ---")
@@ -169,37 +159,92 @@ def main():
                 nome_instancia_carregada = "Manual"
             else:
                 print("Falha ao criar grafo manualmente.")
-                return # Sai se falhou
+                return
         except Exception as e:
             print(f"Erro durante a entrada manual: {e}")
-            return # Sai se deu erro
+            return
     else:
         print("Opção inválida.")
-        return # Sai se opção inválida
+        return
 
-    # Se chegou aqui, um grafo foi carregado ou criado
     if grafo_obj:
-        # Calcula e exibe estatísticas imediatamente (Fluxo Etapa 1 original)
         sucesso_stats = executar_etapa1(grafo_obj)
 
-        # Após exibir estatísticas, oferece opção para Etapa 2 (se aplicável)
         if sucesso_stats and nome_instancia_carregada != "Manual":
-            while True:
-                print("\n--- Opções Adicionais ---")
-                print("[1] Gerar Solução Inicial (Etapa 2 - Path-Scanning)")
-                print("[0] Sair")
-                escolha_extra = input("Digite sua escolha: ").strip()
-                if escolha_extra == "1":
-                    executar_etapa2(grafo_obj, nome_instancia_carregada)
-                    # Após executar a Etapa 2, volta para este menu ou sai?
-                    # Vamos sair por simplicidade, mas pode voltar ao menu.
-                    break
-                elif escolha_extra == "0":
-                    break
-                else:
-                    print("Opção inválida.")
+            print("\n--- Gerando Solução Otimizada (Todas as Estratégias) ---")
+            # 1. Path-Scanning Multi-Start
+            rotas_iniciais, custo_inicial, tempo_inicial = construir_solucao_path_scanning_multi(grafo_obj, tentativas=30)
+            print(f'[Multi-Start] Melhor custo inicial encontrado: {custo_inicial}')
+
+            capacidade_maxima = grafo_obj.capacidade
+
+            # 2. Otimização Conservadora
+            rotas_conserv, custo_conserv, tempo_conserv = melhorar_solucao_2opt(grafo_obj, rotas_iniciais)
+            print(f'[Conservadora] Custo após otimização conservadora: {custo_conserv}')
+
+            # 3. Busca Local Avançada (2-opt, relocate, swap)
+            melhor_rotas = [r for r in rotas_iniciais]
+            for i, rota in enumerate(melhor_rotas):
+                rota.sequencia_visitas_detalhada = two_opt(rota.sequencia_visitas_detalhada, grafo_obj)
+                if hasattr(rota, "atualizar_demanda_custo"):
+                    rota.atualizar_demanda_custo(grafo_obj)
+
+            for ciclo in range(3):
+                melhor_rotas = relocate(melhor_rotas, grafo_obj, capacidade_maxima)
+                for rota in melhor_rotas:
+                    rota.sequencia_visitas_detalhada = two_opt(rota.sequencia_visitas_detalhada, grafo_obj)
+                    if hasattr(rota, "atualizar_demanda_custo"):
+                        rota.atualizar_demanda_custo(grafo_obj)
+            for ciclo in range(3):
+                melhor_rotas = swap(melhor_rotas, grafo_obj, capacidade_maxima)
+                for rota in melhor_rotas:
+                    rota.sequencia_visitas_detalhada = two_opt(rota.sequencia_visitas_detalhada, grafo_obj)
+                    if hasattr(rota, "atualizar_demanda_custo"):
+                        rota.atualizar_demanda_custo(grafo_obj)
+            custo_melhorado = sum(rota.custo_acumulado for rota in melhor_rotas)
+            print(f'[Busca Local] Custo após melhorias locais: {custo_melhorado}')
+
+            # 4. Algoritmo Genético Avançado sobre a melhor solução encontrada até aqui
+            rotas_rr, custo_rr, tempo_ag = otimizar_com_algoritmo_genetico_avancado(grafo_obj, melhor_rotas)
+            print(f'[Algoritmo Genético Avançado] Custo após AG: {custo_rr}')
+
+            # Seleciona a melhor entre as quatro estratégias
+            melhor_solucao = rotas_iniciais
+            melhor_custo_final = custo_inicial
+            metodo = "Path-Scanning Multi-Start"
+            if custo_conserv < melhor_custo_final:
+                melhor_solucao = rotas_conserv
+                melhor_custo_final = custo_conserv
+                metodo = "Otimização Conservadora"
+            if custo_melhorado < melhor_custo_final:
+                melhor_solucao = melhor_rotas
+                melhor_custo_final = custo_melhorado
+                metodo = "Busca Local Avançada"
+            if custo_rr < melhor_custo_final:
+                melhor_solucao = rotas_rr
+                melhor_custo_final = custo_rr
+                metodo = "Ruin & Recreate"
+            print(f'[FINAL] Melhor método: {metodo}, Custo final: {melhor_custo_final}')
+
+            pasta_solucoes_otimizadas = "solucoes_otimizadas"
+            os.makedirs(pasta_solucoes_otimizadas, exist_ok=True)
+            nome_base_instancia = os.path.splitext(nome_instancia_carregada)[0]
+            nome_arquivo_solucao_otimizada = f"sol-{nome_base_instancia}.dat"
+            caminho_arquivo_saida_otimizada = os.path.join(pasta_solucoes_otimizadas, nome_arquivo_solucao_otimizada)
+
+            escrever_arquivo_solucao(melhor_solucao, melhor_custo_final, grafo_obj, caminho_arquivo_saida_otimizada)
+
+            print(f"\nSolução Otimizada gerada para a instância {nome_instancia_carregada}.")
+            print(f"Custo Inicial (Path-Scanning): {int(round(custo_inicial))}")
+            print(f"Custo Conservadora: {int(round(custo_conserv))}")
+            print(f"Custo Busca Local: {int(round(custo_melhorado))}")
+            print(f"Custo Ruin & Recreate: {int(round(custo_rr))}")
+            print(f"Custo Otimizado (Melhor): {int(round(melhor_custo_final))}")
+            print(f"Número de Rotas (Inicial): {len(rotas_iniciais)}")
+            print(f"Arquivo de solução otimizada salvo em: {caminho_arquivo_saida_otimizada}")
+        else:
+            print("Não foi possível gerar a solução inicial para otimização.")
     else:
-        # Caso algo tenha falhado na carga/criação e não saiu antes
         print("Não foi possível carregar ou criar o grafo.")
 
     print("\nEncerrando o programa.")
@@ -210,4 +255,3 @@ if __name__ == "__main__":
     if dname:
         os.chdir(dname)
     main()
-

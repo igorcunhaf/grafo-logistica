@@ -1,79 +1,7 @@
 import math
 import time
 
-class Rota:
-    """Representa uma única rota de um veículo."""
-    def __init__(self, id_rota, deposito_id):
-        """Inicializa uma rota.
-
-        Args:
-            id_rota (int): Identificador único da rota.
-            deposito_id (int): ID do nó do depósito.
-        """
-        self.id_rota = id_rota
-        self.deposito_id = deposito_id
-        self.sequencia_visitas_detalhada = [("D", 0)] # Começa no depósito
-        self.servicos_atendidos = set() # Conjunto de service_ids atendidos nesta rota
-        self.demanda_acumulada = 0
-        self.custo_acumulado = 0
-        self.ultimo_no_visitado = deposito_id
-
-    def adicionar_visita_servico(self, service_id, u, v, demanda, custo_servico, custo_travessia_ate_servico, caminho_ate_servico):
-        """Adiciona a visita a um serviço à rota."""
-        # Adiciona nós de travessia
-        for i in range(len(caminho_ate_servico) -1):
-             no_travessia = caminho_ate_servico[i]
-             if no_travessia != self.deposito_id and no_travessia != u:
-                 self.sequencia_visitas_detalhada.append(("T", no_travessia))
-
-        # Adiciona a visita ao serviço
-        self.sequencia_visitas_detalhada.append(("S", service_id, u, v))
-        self.servicos_atendidos.add(service_id)
-        self.demanda_acumulada += demanda
-        self.custo_acumulado += custo_travessia_ate_servico + custo_servico
-        self.ultimo_no_visitado = v
-
-    def adicionar_retorno_deposito(self, custo_travessia_retorno, caminho_retorno):
-        """Adiciona o retorno ao depósito no final da rota."""
-        for i in range(len(caminho_retorno) -1):
-             no_travessia = caminho_retorno[i]
-             if no_travessia != self.deposito_id:
-                 self.sequencia_visitas_detalhada.append(("T", no_travessia))
-
-        self.sequencia_visitas_detalhada.append(("D", 0))
-        self.custo_acumulado += custo_travessia_retorno
-        self.ultimo_no_visitado = self.deposito_id
-
-    def verificar_capacidade(self, nova_demanda, capacidade_maxima):
-        """Verifica se adicionar uma nova demanda excederia a capacidade."""
-        return self.demanda_acumulada + nova_demanda <= capacidade_maxima
-
-    def get_ultimo_no(self):
-        """Retorna o ID do último nó visitado na rota."""
-        return self.ultimo_no_visitado
-
-    def get_output_format(self):
-        """Formata a rota para o padrão de saída especificado.
-
-        Correção: Conta apenas visitas de serviço (S) para o número de visitas no resumo.
-        """
-        visitas_output = []
-        num_servicos_na_rota = 0 # CORRIGIDO: Conta apenas serviços
-        for tipo, id1, *rest in self.sequencia_visitas_detalhada:
-            if tipo == "D":
-                visitas_output.append(f"(D 0,1,{self.id_rota})")
-                # Não incrementa num_servicos_na_rota
-            elif tipo == "S":
-                service_id = id1
-                u, v = rest
-                visitas_output.append(f"(S {service_id},{u},{v})")
-                num_servicos_na_rota += 1 # CORRIGIDO: Incrementa apenas para serviços
-
-        # Linha de resumo da rota
-        # depósito(0) dia(1) id_rota demanda_total custo_total total_SERVICOS (formato output)
-        resumo = f"0 1 {self.id_rota} {self.demanda_acumulada} {self.custo_acumulado} {num_servicos_na_rota}" # CORRIGIDO
-        sequencia = " ".join(visitas_output)
-        return resumo, sequencia
+from rota import Rota # Importa a classe Rota do novo módulo
 
 
 def construir_solucao_path_scanning(grafo):
@@ -250,3 +178,21 @@ if __name__ == '__main__':
         else:
             print("Falha ao ler o grafo da instância.")
 
+
+
+import random
+
+def construir_solucao_path_scanning_multi(grafo, tentativas=20):
+    melhor_rotas = None
+    melhor_custo = float("inf")
+    melhor_tempo = 0
+    for t in range(tentativas):
+        random_seed = t * 137  # garante diferentes seeds
+        random.seed(random_seed)
+        # Supondo que construir_solucao_path_scanning use alguma aleatoriedade
+        rotas, custo, tempo = construir_solucao_path_scanning(grafo)
+        if custo < melhor_custo:
+            melhor_rotas = rotas
+            melhor_custo = custo
+            melhor_tempo = tempo
+    return melhor_rotas, melhor_custo, melhor_tempo
